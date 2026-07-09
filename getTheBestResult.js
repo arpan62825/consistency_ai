@@ -13,6 +13,7 @@ const groq = new Groq({
 });
 
 let message = "";
+let showIndividualResponse = "";
 const getQuestion = async () => {
   const rl = readLine.createInterface({
     input: process.stdin,
@@ -20,6 +21,9 @@ const getQuestion = async () => {
   });
   try {
     message = await rl.question("Enter your prompt here: ");
+    showIndividualResponse = await rl.question(
+      "Do you want to see the individual response of the models? (y/n): ",
+    );
   } finally {
     rl.close();
   }
@@ -32,23 +36,26 @@ const [groqResponse, openAiResponse, openRouterResponse] = await Promise.all([
   getOpenRouterResponse(message),
 ]);
 
-console.log(
-  "This is the response from Groq:\n\n" +
-    (groqResponse.choices[0]?.message?.content || "") +
-    "\n--------------------------------------------\n",
-);
+const responseType = showIndividualResponse.trim().toLowerCase();
+if (responseType === "y" || responseType === "yes") {
+  console.log(
+    "This is the response from Groq:\n\n" +
+      (groqResponse.choices[0]?.message?.content || "") +
+      "\n--------------------------------------------\n",
+  );
 
-console.log(
-  "This is the response from OpenAI:\n\n" +
-    (openAiResponse.output_text || "") +
-    "\n--------------------------------------------\n",
-);
+  console.log(
+    "This is the response from OpenAI:\n\n" +
+      (openAiResponse.output_text || "") +
+      "\n--------------------------------------------\n",
+  );
 
-console.log(
-  "This is the response from OpenRouter:\n\n" +
-    (openRouterResponse.choices[0]?.message?.content || "") +
-    "\n--------------------------------------------\n",
-);
+  console.log(
+    "This is the response from OpenRouter:\n\n" +
+      (openRouterResponse.choices[0]?.message?.content || "") +
+      "\n--------------------------------------------\n",
+  );
+}
 
 async function compareUsingGroq() {
   const groqText = groqResponse.choices[0]?.message?.content || "";
@@ -81,12 +88,13 @@ async function compareUsingGroq() {
     ],
     model: "openai/gpt-oss-20b",
     max_completion_tokens: 1200,
+    stream: true,
   });
-  console.log(
-    "This is the final combined response using Self-Consistency:\n\n" +
-      (chatCompletion.choices[0]?.message?.content || "") +
-      "\n--------------------------------------------\n",
-  );
+  console.log("This is the final combined response using Self-Consistency:\n");
+  for await (const chunk of chatCompletion) {
+    process.stdout.write(chunk.choices[0]?.delta?.content || "");
+  }
+  console.log("\n--------------------------------------------\n");
 }
 
 await compareUsingGroq();
